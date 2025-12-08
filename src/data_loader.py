@@ -1,0 +1,48 @@
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+def load_txt_signal(filepath, v_ref=5.0, adc_bits=10):
+    """Loads single column ADC txt file, converts to V, removes DC offset."""
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            print(f"File not found: {path}")
+            return None
+        data = np.loadtxt(path)
+        max_adc = (2**adc_bits) - 1
+        voltage = (data / max_adc) * v_ref
+        return voltage - np.mean(voltage)
+    except Exception as e:
+        print(f"Error loading {filepath}: {e}")
+        return None
+
+def load_txt_signal_raw_offset(filepath, v_ref=5.0, adc_bits=10):
+    """Loads single column ADC txt file, converts to V, KEEPS DC offset."""
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            print(f"File not found: {path}")
+            return None
+        data = np.loadtxt(path)
+        max_adc = (2**adc_bits) - 1
+        return (data / max_adc) * v_ref
+    except Exception as e:
+        print(f"Error loading {filepath}: {e}")
+        return None
+
+def load_labeled_csv(filepath):
+    """Loads CSV with 'RawValue' and 'Label' columns."""
+    try:
+        path = Path(filepath)
+        if not path.exists():
+            print(f"File not found: {path}")
+            return None
+        df = pd.read_csv(path)
+        label_map = {'contract': 1, 'relax': 0}
+        if 'Label' in df.columns:
+             df['LabelNumeric'] = df['Label'].astype(str).str.strip().str.lower().map(label_map).fillna(0).astype(int)
+        return df
+    except Exception as e:
+        print(f"Error loading CSV {filepath}: {e}")
+        return None
