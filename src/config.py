@@ -12,3 +12,4 @@ SAVE_PLOTS = True
 # You can define global paths here if needed
 DATA_DIR = "../data"
 RESULTS_DIR = "../results"
+
