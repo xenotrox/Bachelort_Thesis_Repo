@@ -1,0 +1,47 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# --- Project Specific ---
+# Ignore draft plots (safety bucket) so they don't clutter the repo
+results/drafts/
+
+# Optional: Ignore all results if you only want to track code
+# results/
+
+# --- LaTeX Build Artifacts ---
+# Keep .tex, .bib, .sty, but ignore generated files
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lot
+*.lof
+*.pdf
+# (Uncomment *.pdf above if you DO NOT want to track the generated PDF thesis)
+
+# --- Operating System Files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDEs (Optional but recommended) ---
+.vscode/
+.idea/
+*.swp
