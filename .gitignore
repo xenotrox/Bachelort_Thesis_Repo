@@ -33,8 +33,6 @@ results/drafts/
 *.toc
 *.lot
 *.lof
-*.pdf
-# (Uncomment *.pdf above if you DO NOT want to track the generated PDF thesis)
 
 # --- Operating System Files ---
 .DS_Store
