@@ -1,57 +1,105 @@
 #include "Arduino.h"
-#include "EMGFilters.h"
-#include "BandpassFilter4thOrder.h"
-#include "BandpassFilter6thOrder.h"
+#include "BandpassFilter6thOrder.h" 
 
-#define SensorInputPin A1
-
-EMGFilters originalFilter;
-BandpassFilter4thOrder fourthOrderFilter;
-BandpassFilter6thOrder sixthOrderFilter;
-
+// Hardware and Timing Definitions
+#define SensorInputPin A1 
 const int sampleRate = 1000; 
 const unsigned long samplePeriod = 1000000 / sampleRate;
 
-// 4th Order SOS Coeffs (from your provided file) 
-float sosCoeffs4th[2][6] = {
-  {0.03657484, 0.07314967, 0.03657484, 1.0, -1.20017304, 0.68088355},
-  {1.0, -2.0, 1.0, 1.0, -1.6108166, 0.78896695}
-};
+// Thesis Parameters: 90ms window size @ 1000Hz = 90 samples
+const int windowSize = 90; 
 
-// 6th Order SOS Coeffs for 65-135Hz @ 1000Hz
+// Thesis Feature Thresholds (derived from offline evaluation)
+const float rmsThreshold = 0.0435; 
+const float varThreshold = 0.0014; 
+const float wlThreshold = 2.7;     
+
+// Filter Coefficients for 6th-Order Butterworth (65-135 Hz)
+
 float sosCoeffs6th[3][6] = {
   {0.0121, 0.0242, 0.0121, 1.0, -1.3501, 0.7201},
   {1.0, 0.0, -1.0, 1.0, -1.5002, 0.8105},
   {1.0, -2.0, 1.0, 1.0, -1.7503, 0.8902}
 };
 
+BandpassFilter6thOrder thesisFilter;
+
+
+// Circular Buffer for Sliding Window Features
+float buffer[windowSize];
+int bufferIndex = 0;
+bool bufferFilled = false;
+
 void setup() {
   Serial.begin(115200);
   
-  // Original Filter: Notch 50Hz, HP 20Hz, LP 150Hz 
-  originalFilter.init(SAMPLE_FREQ_1000HZ, NOTCH_FREQ_50HZ, true, true, true);
-  
-  fourthOrderFilter.init(sosCoeffs4th);
-  sixthOrderFilter.init(sosCoeffs6th);
+  // Initialize thesis-preferred filter 
+  thesisFilter.init(sosCoeffs6th);
+}
+
+// RMS: Root Mean Square (Primary Feature)
+// Note: Thesis mentioned using Mean Square (sumSquares/N) to save computation 
+float calculateRMS() {
+  float sumSquares = 0.0;
+  for (int i = 0; i < windowSize; i++) {
+    sumSquares += buffer[i] * buffer[i]; 
+  }
+  return sqrt(sumSquares / windowSize); 
+}
+
+// VAR: Variance (Found to be less stable due to window mean fluctuations) 
+float calculateVariance() {
+  float mean = 0.0;
+  for (int i = 0; i < windowSize; i++) mean += buffer[i];
+  mean /= windowSize;
+
+  float sumVariance = 0.0;
+  for (int i = 0; i < windowSize; i++) {
+    sumVariance += pow(buffer[i] - mean, 2); 
+  }
+  return sumVariance / windowSize;
+}
+
+// WL: Waveform Length (Validated as highly correlated to RMS) 
+float calculateWaveformLength() {
+  float wl = 0.0;
+  for (int i = 1; i < windowSize; i++) {
+    wl += abs(buffer[i] - buffer[i - 1]); 
+  }
+  return wl;
 }
 
 void loop() {
   unsigned long startTime = micros();
 
+  // 1. Sampling (10-bit ADC) 
   int rawValue = analogRead(SensorInputPin);
+  
+  // 2. 6th Order Filtering (Thesis Choice) 
+  // Processing raw ADC values directly to maintain consistency with thesis evaluation
+  float filteredValue = thesisFilter.update((float)rawValue);
 
-  // Update all filters for comparison
-  float origVal = (float)originalFilter.update(rawValue);
-  float fourthVal = fourthOrderFilter.update((float)rawValue);
-  float sixthVal = sixthOrderFilter.update((float)rawValue);
+  // 3. Update Sliding Window
+  buffer[bufferIndex] = filteredValue;
+  bufferIndex = (bufferIndex + 1) % windowSize;
+  if (bufferIndex == 0) bufferFilled = true;
 
-  // CSV Output for Serial Plotter/Recording 
-  Serial.print(rawValue); Serial.print(",");
-  Serial.print(origVal); Serial.print(",");
-  Serial.print(fourthVal); Serial.print(",");
-  Serial.println(sixthVal);
+  if (bufferFilled) {
+    // 4. Feature Computation 
+    float rms = calculateRMS();
+    float var = calculateVariance();
+    float wl = calculateWaveformLength();
 
-  // Maintain 1000Hz
+    // 5. Comparison Output (Matches Figures 10 & 11 in thesis)
+    Serial.print("Raw:"); Serial.print(rawValue);
+    Serial.print(",Filtered:"); Serial.print(filteredValue);
+    Serial.print(",RMS:"); Serial.print(rms, 4);
+    Serial.print(",VAR:"); Serial.print(var, 4);
+    Serial.print(",WL:"); Serial.println(wl, 4);
+    
+  }
+
+  // 6. Timing Discipline 
   unsigned long elapsedTime = micros() - startTime;
   if (elapsedTime < samplePeriod) {
     delayMicroseconds(samplePeriod - elapsedTime);
